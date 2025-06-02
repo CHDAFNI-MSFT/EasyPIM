@@ -133,7 +133,10 @@ function Get-PIMAzureResourceEligibleAssignment {
         $return = @()
         #$id=$response.value.id
         #$response.value.properties |get-member
-
+if( $null -eq $response.value -or $response.value.Count -eq 0) {
+            Write-Output "0 active assignment(s) found for scope $scope"
+            return @()
+        }
         $response.value | ForEach-Object {
             $id = $_.id
             #echo "ID: $id"
