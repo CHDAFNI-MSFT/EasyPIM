@@ -6,9 +6,8 @@
     .Parameter tenantID
     EntraID tenant ID
     .Parameter summary
-    When enabled will return the most useful information only
-    .PARAMETER rolename
-    Filter by rolename    .PARAMETER principalid
+    When enabled will return the most useful information only    .PARAMETER rolename
+    Filter by rolename (supports multiple role names).PARAMETER principalid
     Filter by principalid
     .PARAMETER principalName
     Filter by principalName
@@ -40,9 +39,8 @@ function Get-PIMEntraRoleActiveAssignment {
         [String]
         $tenantID,
         # select the most usefull info only
-        [switch]$summary,
-        [string]$principalid,
-        [string]$rolename,
+        [switch]$summary,        [string]$principalid,
+        [string[]]$rolename,
         [string]$principalName,
         [string]$userPrincipalName
     )    try {
@@ -73,11 +71,18 @@ function Get-PIMEntraRoleActiveAssignment {
         $effectivePrincipalId = if ($resolvedPrincipalId) { $resolvedPrincipalId } else { $principalid }
         if ($PSBoundParameters.Keys.Contains('principalid') -or $resolvedPrincipalId) {
             $graphFilters += "principal/id eq '$effectivePrincipalId'"
+        }        if ($PSBoundParameters.Keys.Contains('rolename')) {
+            # Handle multiple role names with OR conditions
+            if ($rolename.Count -eq 1) {
+                # Single role name
+                $rolenameLower = $rolename[0].ToLower()
+                $graphFilters += "tolower(roleDefinition/displayName) eq '$rolenameLower'"
+            } else {
+                # Multiple role names - create OR conditions
+                $roleFilters = $rolename | ForEach-Object { "tolower(roleDefinition/displayName) eq '$($_.ToLower())'" }
+                $graphFilters += "($($roleFilters -join ' or '))"
+            }
         }
-        if ($PSBoundParameters.Keys.Contains('rolename')) {
-            # Use tolower() for case-insensitive comparison
-            $rolenameLower = $rolename.ToLower()
-            $graphFilters += "tolower(roleDefinition/displayName) eq '$rolenameLower'"        }
 
         # Note: principalName filtering not supported by Graph API for this endpoint
         # Will be handled with PowerShell filtering after retrieval

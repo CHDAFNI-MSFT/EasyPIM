@@ -6,9 +6,8 @@
     .Parameter tenantID
     EntraID tenant ID
     .Parameter summary
-    When enabled will return the most useful information only
-    .PARAMETER rolename
-    Filter by rolename
+    When enabled will return the most useful information only    .PARAMETER rolename
+    Filter by rolename (supports multiple role names)
     .PARAMETER principalid
     Filter by principalid    .PARAMETER userPrincipalName
     Filter by userPrincipalName (UPN). Will resolve to object ID for efficient Graph API filtering.    .Example
@@ -34,11 +33,10 @@ function Get-PIMEntraRoleEligibleAssignment {
     param (
         [Parameter(Position = 0, Mandatory = $true)]
         [String]
-        $tenantID,
-        # select the most usefull info only
+        $tenantID,        # select the most usefull info only
         [switch]$summary,
         [string]$principalid,
-        [string]$rolename,
+        [string[]]$rolename,
         [string]$userPrincipalName
     )    try {        $script:tenantID = $tenantID
 
@@ -67,12 +65,18 @@ function Get-PIMEntraRoleEligibleAssignment {
         $effectivePrincipalId = if ($resolvedPrincipalId) { $resolvedPrincipalId } else { $principalid }
         if ($PSBoundParameters.Keys.Contains('principalid') -or $resolvedPrincipalId) {
             $graphFilters += "principal/id eq '$effectivePrincipalId'"
+        }        if ($PSBoundParameters.Keys.Contains('rolename')) {
+            # Handle multiple role names with OR conditions
+            if ($rolename.Count -eq 1) {
+                # Single role name
+                $rolenameLower = $rolename[0].ToLower()
+                $graphFilters += "tolower(roleDefinition/displayName) eq '$rolenameLower'"
+            } else {
+                # Multiple role names - create OR conditions
+                $roleFilters = $rolename | ForEach-Object { "tolower(roleDefinition/displayName) eq '$($_.ToLower())'" }
+                $graphFilters += "($($roleFilters -join ' or '))"
+            }
         }
-
-        if ($PSBoundParameters.Keys.Contains('rolename')) {
-            # Use tolower() for case-insensitive comparison
-            $rolenameLower = $rolename.ToLower()
-            $graphFilters += "tolower(roleDefinition/displayName) eq '$rolenameLower'"        }
 
         # Note: userPrincipalName is now resolved to object ID above for efficient Graph API filtering
         # This eliminates the need for PowerShell filtering after retrieval
